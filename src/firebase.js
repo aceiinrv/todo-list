@@ -1,23 +1,21 @@
 // Import the functions you need from the SDKs
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
-// PASTE YOUR FIREBASE CONFIG OBJECT HERE
+// These variables are loaded from the .env file
 const firebaseConfig = {
-  apiKey: "AIzaSyAt235AjLqWDQZWmkQr2t5G2xKkTcXO9To",
-  authDomain: "react-todo-app-9e865.firebaseapp.com",
-  projectId: "react-todo-app-9e865",
-  storageBucket: "react-todo-app-9e865.firebasestorage.app",
-  messagingSenderId: "959859993016",
-  appId: "1:959859993016:web:57eee1d256c24f390dc74d",
-  measurementId: "G-RSF9Y5VF6D"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 
 // Export the firestore database instance
 export const db = getFirestore(app);
