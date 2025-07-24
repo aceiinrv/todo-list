@@ -1,0 +1,214 @@
+/* Import a modern font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --background-color: #f7f9fc;
+  --container-bg: #ffffff;
+  --column-bg: #f1f2f5;
+  --primary-text: #2c3e50;
+  --secondary-text: #828282;
+  --primary-accent: #4a90e2;
+  --accent-hover: #357ABD;
+  --danger-color: #e74c3c;
+  --success-color: #2ecc71;
+  --border-color: #e0e0e0;
+  --shadow-color: rgba(99, 99, 99, 0.1);
+  --tag-bg: #ecf0f1;
+  --tag-text: #7f8c8d;
+}
+
+body {
+  background-color: var(--background-color);
+  font-family: 'Inter', sans-serif;
+  color: var(--primary-text);
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  font-weight: 700;
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+/* Add Task & Tag Manager Section */
+.controls-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px;
+  background-color: var(--container-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px var(--shadow-color);
+  margin-bottom: 30px;
+}
+
+.add-task-form { flex: 2; }
+.tag-manager { flex: 1; }
+
+.form-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 15px;
+}
+
+.input-group label {
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: var(--secondary-text);
+  font-size: 0.9rem;
+}
+
+.form-input {
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.optional-inputs {
+  display: flex;
+  gap: 15px;
+}
+
+.tag-select {
+  width: 100%;
+  padding: 10px;
+}
+
+.add-task-button {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background-color: var(--primary-accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.add-task-button:hover { background-color: var(--accent-hover); }
+
+/* Tag Manager Specifics */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+.tag-item {
+  background-color: var(--tag-bg);
+  color: var(--tag-text);
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.add-tag-group {
+  display: flex;
+  gap: 10px;
+}
+
+/* Board Layout */
+.board-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+.column {
+  background-color: var(--column-bg);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 400px;
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.column-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+/* Filter Dropdown */
+.filter { position: relative; }
+.filter-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--secondary-text);
+}
+.filter-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--container-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px var(--shadow-color);
+  padding: 10px;
+  z-index: 10;
+  width: 200px;
+}
+.filter-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.filter-option:hover { background-color: var(--column-bg); }
+
+/* Task Card Styling */
+.task-card {
+  background-color: var(--container-bg);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 5px var(--shadow-color);
+  border-left: 5px solid var(--primary-accent);
+}
+.task-card.status-doing { border-left-color: #f39c12; /* Orange */ }
+.task-card.status-done { border-left-color: var(--success-color); }
+
+.task-card p { margin-top: 0; font-size: 1.1rem; }
+.task-details {
+  font-size: 0.85rem;
+  color: var(--secondary-text);
+  margin: 10px 0;
+}
+.task-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+.task-actions button {
+  background: none; border: none; cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.play-button { color: var(--success-color); }
+.complete-button { color: var(--success-color); }
+.edit-button { color: var(--primary-text); }
+.delete-button { color: var(--danger-color); }
