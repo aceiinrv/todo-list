@@ -1,18 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
-import { db } from './firebase';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import Select from 'react-select';
 import { Flame, Play, Check, Trash2, Bell, Clock, Calendar, Plus, Settings } from 'lucide-react';
 
-// A new component to manage the countdown timer and progress bar for a task
+// A custom hook to detect clicks outside a specified element
+function useOnClickOutside(ref, handler) {
+  useEffect(() => {
+    const listener = (event) => {
+      // Do nothing if clicking ref's element or descendent elements
+      if (!ref.current || ref.current.contains(event.target)) {
+        return;
+      }
+      handler(event);
+    };
+    document.addEventListener("mousedown", listener);
+    document.addEventListener("touchstart", listener);
+    return () => {
+      document.removeEventListener("mousedown", listener);
+      document.removeEventListener("touchstart", listener);
+    };
+  }, [ref, handler]);
+}
+
 const TaskTimer = ({ task, onTimerEnd }) => {
   const [remainingTime, setRemainingTime] = useState(null);
 
   useEffect(() => {
     if (!task.startTime || !task.duration) return;
 
-    const startTimeMs = task.startTime.toDate().getTime();
+    // Firestore timestamps need to be converted to JS Dates
+    const startTimeMs = task.startTime.toDate ? task.startTime.toDate().getTime() : new Date(task.startTime).getTime();
     const durationMs = task.duration * 60 * 1000;
     const endTimeMs = startTimeMs + durationMs;
 
@@ -53,8 +73,6 @@ const TaskTimer = ({ task, onTimerEnd }) => {
     </div>
   );
 };
-
-// A new component for the notification bell and its dropdown
 const NotificationBell = ({ notifications, setNotifications }) => {
     const [isOpen, setIsOpen] = useState(false);
     const unreadCount = notifications.filter(n => !n.read).length;
@@ -91,11 +109,15 @@ const NotificationBell = ({ notifications, setNotifications }) => {
 function App() {
   const [tasks, setTasks] = useState([]);
   const [tags, setTags] = useState([]);
+  const [userId, setUserId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [inputText, setInputText] = useState('');
   const [deadline, setDeadline] = useState('');
   const [duration, setDuration] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
   const [newTag, setNewTag] = useState('');
+  
   const [notifications, setNotifications] = useState([]);
   const [activeFilters, setActiveFilters] = useState({
     urgent: { sort: 'newest' },
@@ -104,35 +126,39 @@ function App() {
     done: { sort: 'newest' },
   });
 
-  // Effect to check for overdue tasks
   useEffect(() => {
-    const newOverdueNotifications = [];
-    tasks.forEach(task => {
-        if (task.deadline && new Date(task.deadline) < new Date() && task.status !== 'done') {
-            const id = `overdue-${task.id}`;
-            // Add notification only if it doesn't already exist
-            if (!notifications.some(n => n.id === id)) {
-                newOverdueNotifications.push({
-                    id,
-                    message: `Task "${task.text}" is past its deadline.`,
-                    read: false,
-                    timestamp: new Date()
-                });
-            }
-        }
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        signInAnonymously(auth).catch(error => {
+          console.error("Anonymous sign-in failed:", error);
+        });
+      }
     });
-    if (newOverdueNotifications.length > 0) {
-        setNotifications(prev => [...prev, ...newOverdueNotifications]);
-    }
-  }, [tasks]); // Reruns when tasks are updated
-
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
-    const tasksQuery = query(collection(db, 'tasks'), orderBy('timestamp', 'desc'));
-    const tagsQuery = query(collection(db, 'tags'), orderBy('name'));
+    if (!userId) return;
+
+    setIsLoading(true);
+
+    const tasksQuery = query(
+      collection(db, 'tasks'),
+      where('userId', '==', userId),
+      orderBy('timestamp', 'desc')
+    );
+    
+    const tagsQuery = query(
+      collection(db, 'tags'),
+      where('userId', '==', userId),
+      orderBy('name')
+    );
 
     const unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      setIsLoading(false);
     });
     const unsubscribeTags = onSnapshot(tagsQuery, (snapshot) => {
       setTags(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
@@ -142,11 +168,11 @@ function App() {
       unsubscribeTasks();
       unsubscribeTags();
     };
-  }, []);
+  }, [userId]);
 
   const addTask = async (e) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !userId) return;
     await addDoc(collection(db, 'tasks'), {
       text: inputText,
       status: 'todo',
@@ -154,6 +180,7 @@ function App() {
       duration: Number(duration) || null,
       tags: selectedTags.map(tag => tag.value),
       timestamp: new Date(),
+      userId: userId,
     });
     setInputText('');
     setDeadline('');
@@ -163,23 +190,22 @@ function App() {
 
   const addTag = async (e) => {
     e.preventDefault();
-    if (!newTag.trim()) return;
-    // Check if tag already exists to avoid duplicates
-    const existingTag = tags.find(tag => tag.name === newTag.trim().toLowerCase());
-    if(existingTag) {
+    if (!newTag.trim() || !userId) return;
+    const tagName = newTag.trim().toLowerCase();
+    if (tags.find(tag => tag.name === tagName)) {
         alert("Tag already exists!");
         return;
     }
-    await addDoc(collection(db, 'tags'), { name: newTag.trim().toLowerCase() });
+    await addDoc(collection(db, 'tags'), {
+      name: tagName,
+      userId: userId,
+    });
     setNewTag('');
   };
 
-  // Updated function to handle all status changes, including timers
   const updateTaskStatus = async (task, newStatus) => {
     const taskDoc = doc(db, 'tasks', task.id);
     const updateData = { status: newStatus };
-
-    // When moving a task to 'doing', record its start time for the timer
     if (newStatus === 'doing' && task.duration) {
       updateData.startTime = new Date();
     }
@@ -191,14 +217,12 @@ function App() {
       await deleteDoc(doc(db, 'tasks', id));
     }
   };
-
-  // Handler for when a task timer completes
+  
   const handleTimerEnd = useCallback((task) => {
     const id = `timer-end-${task.id}`;
-    // Use a functional update to prevent race conditions and ensure we have the latest state
     setNotifications(currentNotifications => {
         if (currentNotifications.some(n => n.id === id)) {
-            return currentNotifications; // Already exists, do nothing
+            return currentNotifications;
         }
         return [
             ...currentNotifications,
@@ -223,12 +247,15 @@ function App() {
         break;
       case 'newest':
       default:
-        // Ensure timestamp is a Date object before comparing
         filtered.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
         break;
     }
     return filtered;
   };
+
+  if (isLoading && !userId) {
+      return <div>Loading...</div>;
+  }
 
   const columnsData = {
       urgent: applyFilters(tasks.filter(t => t.status === 'urgent'), activeFilters.urgent),
@@ -241,13 +268,18 @@ function App() {
   
   const FilterComponent = ({ columnKey, setFilter }) => {
       const [isOpen, setIsOpen] = useState(false);
+      const dropdownRef = useRef(null);
+
+      useOnClickOutside(dropdownRef, () => setIsOpen(false));
+
       const handleSelect = (option) => {
           setFilter(prev => ({ ...prev, [columnKey]: { ...prev[columnKey], sort: option }}));
           setIsOpen(false);
       }
+      
       return (
-          <div className="filter">
-              <button onClick={() => setIsOpen(!isOpen)} className="icon-button"><Settings size={20}/></button>
+          <div className="filter" ref={dropdownRef}>
+              <button onClick={() => setIsOpen(!isOpen)} className="icon-button"><Settings size={18}/></button>
               {isOpen && (
                   <div className="filter-dropdown">
                       <div className="filter-option" onClick={() => handleSelect('newest')}>Sort by Newest</div>
@@ -260,10 +292,10 @@ function App() {
   }
 
   const columnDetails = {
-    urgent: { title: "Urgent", icon: <Flame size={24} className="column-icon" /> },
-    todo: { title: "To Do", icon: <Calendar size={24} className="column-icon" /> },
-    doing: { title: "Doing", icon: <Clock size={24} className="column-icon" /> },
-    done: { title: "Done", icon: <Check size={24} className="column-icon" /> },
+    urgent: { title: "Urgent", icon: <Flame size={20} className="column-icon" /> },
+    todo: { title: "To Do", icon: <Calendar size={20} className="column-icon" /> },
+    doing: { title: "Doing", icon: <Clock size={20} className="column-icon" /> },
+    done: { title: "Done", icon: <Check size={20} className="column-icon" /> },
   }
 
   return (
@@ -275,7 +307,7 @@ function App() {
 
       <section className="controls-container">
         <div className="add-task-form form-section">
-          <h3>Add a New Task</h3>
+          <h3><Plus size={20} /> Add a New Task</h3>
           <form onSubmit={addTask}>
             <div className="input-group">
                 <label>Task Name</label>
@@ -293,7 +325,12 @@ function App() {
             </div>
             <div className="input-group">
               <label>Tags</label>
-              <Select options={tagOptions} isMulti value={selectedTags} onChange={setSelectedTags} className="tag-select" />
+              <Select options={tagOptions} isMulti value={selectedTags} onChange={setSelectedTags} className="tag-select" 
+                styles={{ 
+                  control: (base) => ({...base, backgroundColor: '#f7faff', borderColor: 'var(--border-color)', minHeight: '48px'}),
+                  menu: (base) => ({...base, backgroundColor: 'var(--container-bg)', zIndex: 5})
+                }}
+              />
             </div>
             <button type="submit" className="add-task-button"><Plus size={16}/> Add Task</button>
           </form>
@@ -306,7 +343,7 @@ function App() {
           </div>
           <form onSubmit={addTag} className="add-tag-group">
             <input type="text" value={newTag} onChange={e => setNewTag(e.target.value)} placeholder="New tag name" className="form-input" />
-            <button type="submit" className="add-tag-button">+</button>
+            <button type="submit" className="add-tag-button"><Plus size={16}/></button>
           </form>
         </div>
       </section>
